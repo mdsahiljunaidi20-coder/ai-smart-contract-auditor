@@ -1,0 +1,15 @@
+ARCHITECTURE (MVP - First 10 Days)
+
+User
+  ↓
+Frontend (React + Monaco Editor)
+  ↓ (send contract code via API)
+Backend (FastAPI)
+  ↓
+Rule-Based Scanner (custom code)
+  ↓
+Slither Analyzer
+  ↓
+JSON Report
+  ↓
+MongoDB (store result)
