@@ -26,15 +26,16 @@ Build a smart contract auditing system that checks for vulnerabilities using:
 - Simple React UI
 
 ## 📅 Timeline
-| Day   | Task                          |
-|-------|-------------------------------|
-| Day 1 | Setup project structure + Git |
-| Day 2 | Backend setup                 |                
-| Day 3 | Rule engine start             |
-| Day 4 | Slither integration           |
-| Day 5 | Scoring + report              | 
-| Day 6 | Test with contracts           |
-| Day 7 | UI setup                      |
-| Day 8–10 | Integration + deployment   | 
+|Day| Task                          |
+|---|-------------------------------|
+| 1 | Setup project structure + Git |
+| 2 | Backend setup                 |                
+| 3 | Rule engine start             |
+| 4 | Add real rule-based vulnerabilities|
+| 5 | Scoring + report              | 
+| 6 | Install Slither + solc + test Slither |
+| 7 | Integrate Slither output into API |
+| 8 | UI setup (frontend)  | 
+|9-10 |Integration + deployment|
 
 TEAM BLOCK
