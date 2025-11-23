@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List
+from datetime import datetime
 
 app = FastAPI()
 
@@ -14,19 +15,15 @@ class ContractInput(BaseModel):
 
 
 # ----------------------------------------------------------
-# 2. Helper function: get line numbers that contain a keyword
+# 2. Helper function: get line numbers for a keyword
 # ----------------------------------------------------------
 def find_lines_with(code: str, keyword: str) -> List[int]:
     lines = code.split("\n")
-    result = []
-    for i, line in enumerate(lines, start=1):
-        if keyword in line:
-            result.append(i)
-    return result
+    return [i + 1 for i, line in enumerate(lines) if keyword in line]
 
 
 # ----------------------------------------------------------
-# 3. Rule-Based Vulnerability Scanner (Day 4)
+# 3. Rule-Based Vulnerability Scanner (Same as Day 4)
 # ----------------------------------------------------------
 def rule_based_scan(code: str):
 
@@ -39,12 +36,12 @@ def rule_based_scan(code: str):
             "id": "TX_ORIGIN_AUTH",
             "title": "Use of tx.origin for authentication",
             "severity": "HIGH",
-            "description": "tx.origin is insecure and can be exploited through phishing attacks.",
-            "recommendation": "Use msg.sender for authorization checks.",
+            "description": "tx.origin is insecure and can be exploited via phishing.",
+            "recommendation": "Use msg.sender instead.",
             "line_numbers": origin_lines
         })
 
-    # 2. Detect timestamp dependence
+    # 2. Timestamp dependence
     timestamp_lines = (
         find_lines_with(code, "block.timestamp")
         + find_lines_with(code, "now")
@@ -54,8 +51,8 @@ def rule_based_scan(code: str):
             "id": "TIMESTAMP_DEPENDENCE",
             "title": "Timestamp dependence",
             "severity": "MEDIUM",
-            "description": "block.timestamp / now can be manipulated by miners.",
-            "recommendation": "Avoid using timestamps for critical logic.",
+            "description": "Miners can manipulate timestamps.",
+            "recommendation": "Do not rely on timestamp for critical logic.",
             "line_numbers": timestamp_lines
         })
 
@@ -70,20 +67,23 @@ def rule_based_scan(code: str):
             "id": "LOW_LEVEL_CALL",
             "title": "Use of low-level calls",
             "severity": "MEDIUM",
-            "description": "Low-level calls bypass type safety and may introduce reentrancy risk.",
-            "recommendation": "Use function calls or OpenZeppelin's Address library.",
+            "description": "Low-level calls may introduce reentrancy risk.",
+            "recommendation": "Use OpenZeppelin Address library instead.",
             "line_numbers": low_level_lines
         })
 
-    # 4. Detect reentrancy risk
-    transfer_lines = find_lines_with(code, ".transfer(") + find_lines_with(code, ".send(")
+    # 4. Reentrancy indicators
+    transfer_lines = (
+        find_lines_with(code, ".transfer(")
+        + find_lines_with(code, ".send(")
+    )
     if transfer_lines:
         issues.append({
             "id": "REENTRANCY_RISK",
-            "title": "Potential Reentrancy vulnerability",
+            "title": "Potential Reentrancy Vulnerability",
             "severity": "HIGH",
-            "description": "External calls detected. If state changes are after these calls, reentrancy attack may occur.",
-            "recommendation": "Use checks-effects-interactions pattern or ReentrancyGuard.",
+            "description": "External calls detected before state changes.",
+            "recommendation": "Use checks-effects-interactions and ReentrancyGuard.",
             "line_numbers": transfer_lines
         })
 
@@ -91,10 +91,11 @@ def rule_based_scan(code: str):
 
 
 # ----------------------------------------------------------
-# 4. Risk Scoring System
+# 4. Improved Scoring System (Day 5 Upgrade)
 # ----------------------------------------------------------
 def calculate_risk_score(issues: List[dict]) -> int:
     score = 0
+
     for item in issues:
         if item["severity"] == "HIGH":
             score += 40
@@ -103,23 +104,31 @@ def calculate_risk_score(issues: List[dict]) -> int:
         else:
             score += 10
 
+    # Cap score at 100
     return min(score, 100)
 
 
 # ----------------------------------------------------------
-# 5. POST /analyze endpoint (updated for Day 4)
+# 5. POST /analyze — Now with metadata + sorted results
 # ----------------------------------------------------------
 @app.post("/analyze")
 def analyze_contract(data: ContractInput):
 
     issues = rule_based_scan(data.code)
+    issues_sorted = sorted(issues, key=lambda x: x["severity"], reverse=True)
+
     score = calculate_risk_score(issues)
 
-    return {
+    report = {
         "contract_name": data.contract_name,
+        "timestamp": datetime.utcnow().isoformat(),
+        "lines_of_code": len(data.code.split("\n")),
+        "issues_found": len(issues),
         "risk_score": score,
-        "issues": issues
+        "issues": issues_sorted
     }
+
+    return report
 
 
 # ----------------------------------------------------------
