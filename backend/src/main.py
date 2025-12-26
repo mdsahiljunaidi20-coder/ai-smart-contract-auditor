@@ -1,3 +1,5 @@
+from src.slither_runner import run_slither
+import json
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List
@@ -114,21 +116,32 @@ def calculate_risk_score(issues: List[dict]) -> int:
 @app.post("/analyze")
 def analyze_contract(data: ContractInput):
 
-    issues = rule_based_scan(data.code)
-    issues_sorted = sorted(issues, key=lambda x: x["severity"], reverse=True)
+    # 1. Rule-based scan
+    rule_issues = rule_based_scan(data.code)
 
-    score = calculate_risk_score(issues)
+    # 2. Slither scan
+    slither_raw = run_slither(data.code)
+
+    try:
+        slither_json = json.loads(slither_raw)
+    except Exception:
+        slither_json = {"error": slither_raw}
+
+    # 3. Risk score (based on rule engine for now)
+    score = calculate_risk_score(rule_issues)
 
     report = {
         "contract_name": data.contract_name,
         "timestamp": datetime.utcnow().isoformat(),
         "lines_of_code": len(data.code.split("\n")),
-        "issues_found": len(issues),
+        "rule_issues_found": len(rule_issues),
         "risk_score": score,
-        "issues": issues_sorted
+        "rule_based_issues": rule_issues,
+        "slither_analysis": slither_json
     }
 
     return report
+
 
 
 # ----------------------------------------------------------
