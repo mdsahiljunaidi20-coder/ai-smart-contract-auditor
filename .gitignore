@@ -1,4 +1,16 @@
+# Python cache
 __pycache__/
+*.pyc
+
+# Environment variables
 .env
-node_modules/
+
+# Virtual environments
+backend-venv/
 venv/
+
+# Node (if ever used)
+node_modules/
+
+# OS junk
+.DS_Store
