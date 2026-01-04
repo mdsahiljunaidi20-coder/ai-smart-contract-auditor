@@ -1,139 +1,165 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
 from datetime import datetime
+import subprocess
+import tempfile
+import json
+import uuid
+from pathlib import Path
 
-app = FastAPI()
+# =========================
+# App Init
+# =========================
+app = FastAPI(title="AI Smart Contract Auditor")
 
+# =========================
+# Storage (Day 8)
+# =========================
+REPORTS_DIR = Path("reports")
+REPORTS_DIR.mkdir(exist_ok=True)
 
-# ----------------------------------------------------------
-# 1. Input Model
-# ----------------------------------------------------------
+# =========================
+# Input Schema
+# =========================
 class ContractInput(BaseModel):
     contract_name: str
     code: str
 
-
-# ----------------------------------------------------------
-# 2. Helper function: get line numbers for a keyword
-# ----------------------------------------------------------
-def find_lines_with(code: str, keyword: str) -> List[int]:
-    lines = code.split("\n")
-    return [i + 1 for i, line in enumerate(lines) if keyword in line]
-
-
-# ----------------------------------------------------------
-# 3. Rule-Based Vulnerability Scanner (Same as Day 4)
-# ----------------------------------------------------------
+# =========================
+# Rule-Based Detector (Day 7)
+# =========================
 def rule_based_scan(code: str):
-
     issues = []
 
-    # 1. Detect tx.origin
-    origin_lines = find_lines_with(code, "tx.origin")
-    if origin_lines:
+    if "tx.origin" in code:
         issues.append({
-            "id": "TX_ORIGIN_AUTH",
-            "title": "Use of tx.origin for authentication",
-            "severity": "HIGH",
-            "description": "tx.origin is insecure and can be exploited via phishing.",
-            "recommendation": "Use msg.sender instead.",
-            "line_numbers": origin_lines
+            "source": "rule",
+            "check": "tx.origin usage",
+            "impact": "High",
+            "description": "Use of tx.origin for authentication is insecure"
         })
 
-    # 2. Timestamp dependence
-    timestamp_lines = (
-        find_lines_with(code, "block.timestamp")
-        + find_lines_with(code, "now")
-    )
-    if timestamp_lines:
+    if ".call(" in code or ".call{" in code:
         issues.append({
-            "id": "TIMESTAMP_DEPENDENCE",
-            "title": "Timestamp dependence",
-            "severity": "MEDIUM",
-            "description": "Miners can manipulate timestamps.",
-            "recommendation": "Do not rely on timestamp for critical logic.",
-            "line_numbers": timestamp_lines
-        })
-
-    # 3. Detect low-level calls
-    low_level_lines = (
-        find_lines_with(code, ".call(")
-        + find_lines_with(code, ".delegatecall(")
-        + find_lines_with(code, ".call.value(")
-    )
-    if low_level_lines:
-        issues.append({
-            "id": "LOW_LEVEL_CALL",
-            "title": "Use of low-level calls",
-            "severity": "MEDIUM",
-            "description": "Low-level calls may introduce reentrancy risk.",
-            "recommendation": "Use OpenZeppelin Address library instead.",
-            "line_numbers": low_level_lines
-        })
-
-    # 4. Reentrancy indicators
-    transfer_lines = (
-        find_lines_with(code, ".transfer(")
-        + find_lines_with(code, ".send(")
-    )
-    if transfer_lines:
-        issues.append({
-            "id": "REENTRANCY_RISK",
-            "title": "Potential Reentrancy Vulnerability",
-            "severity": "HIGH",
-            "description": "External calls detected before state changes.",
-            "recommendation": "Use checks-effects-interactions and ReentrancyGuard.",
-            "line_numbers": transfer_lines
+            "source": "rule",
+            "check": "Low-level call",
+            "impact": "Medium",
+            "description": "Low-level call may lead to reentrancy"
         })
 
     return issues
 
+# =========================
+# Slither Runner (Day 7)
+# =========================
+def run_slither(code: str):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sol_file = Path(tmpdir) / "contract.sol"
+        sol_file.write_text(code)
 
-# ----------------------------------------------------------
-# 4. Improved Scoring System (Day 5 Upgrade)
-# ----------------------------------------------------------
-def calculate_risk_score(issues: List[dict]) -> int:
-    score = 0
+        cmd = [
+            "slither",
+            str(sol_file),
+            "--json",
+            "-"
+        ]
 
-    for item in issues:
-        if item["severity"] == "HIGH":
-            score += 40
-        elif item["severity"] == "MEDIUM":
-            score += 20
-        else:
-            score += 10
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
 
-    # Cap score at 100
-    return min(score, 100)
+            if result.returncode != 0 and not result.stdout:
+                return []
 
+            data = json.loads(result.stdout)
+            findings = []
 
-# ----------------------------------------------------------
-# 5. POST /analyze — Now with metadata + sorted results
-# ----------------------------------------------------------
+            for item in data.get("results", {}).get("detectors", []):
+                findings.append({
+                    "source": "slither",
+                    "check": item.get("check"),
+                    "impact": item.get("impact"),
+                    "confidence": item.get("confidence"),
+                    "description": item.get("description")
+                })
+
+            return findings
+
+        except Exception as e:
+            return [{
+                "source": "slither",
+                "check": "Execution error",
+                "impact": "Error",
+                "description": str(e)
+            }]
+
+# =========================
+# Analyze API (Day 7)
+# =========================
 @app.post("/analyze")
-def analyze_contract(data: ContractInput):
+def analyze_contract(input: ContractInput):
+    rule_issues = rule_based_scan(input.code)
+    slither_issues = run_slither(input.code)
 
-    issues = rule_based_scan(data.code)
-    issues_sorted = sorted(issues, key=lambda x: x["severity"], reverse=True)
-
-    score = calculate_risk_score(issues)
+    issues = rule_issues + slither_issues
 
     report = {
-        "contract_name": data.contract_name,
-        "timestamp": datetime.utcnow().isoformat(),
-        "lines_of_code": len(data.code.split("\n")),
-        "issues_found": len(issues),
-        "risk_score": score,
-        "issues": issues_sorted
+        "contract": input.contract_name,
+        "total_issues": len(issues),
+        "issues": issues
     }
+
+    audit_id = save_report(report)
+    report["audit_id"] = audit_id
 
     return report
 
+# =========================
+# Report Storage (Day 8)
+# =========================
+def save_report(report: dict) -> str:
+    audit_id = str(uuid.uuid4())
+    report["audit_id"] = audit_id
+    report["timestamp"] = datetime.utcnow().isoformat()
 
-# ----------------------------------------------------------
-# 6. Home Route
-# ----------------------------------------------------------
+    file_path = REPORTS_DIR / f"{audit_id}.json"
+    with open(file_path, "w") as f:
+        json.dump(report, f, indent=2)
+
+    return audit_id
+
+@app.get("/reports/{audit_id}")
+def get_report(audit_id: str):
+    file_path = REPORTS_DIR / f"{audit_id}.json"
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    with open(file_path) as f:
+        return json.load(f)
+
+@app.get("/reports")
+def list_reports(limit: int = 10):
+    files = sorted(
+        REPORTS_DIR.glob("*.json"),
+        key=lambda f: f.stat().st_mtime,
+        reverse=True
+    )
+
+    reports = []
+    for f in files[:limit]:
+        with open(f) as file:
+            reports.append(json.load(file))
+
+    return reports
+
+# =========================
+# Health Check
+# =========================
 @app.get("/")
-def home():
-    return {"message": "AI Smart Contract Auditor Backend Running!"}
+def root():
+    return {"message": "AI Smart Contract Auditor Backend Running"}

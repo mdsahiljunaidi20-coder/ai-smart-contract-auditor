@@ -1,0 +1,28 @@
+{
+  "contract": "TestContract",
+  "total_issues": 3,
+  "issues": [
+    {
+      "source": "rule",
+      "check": "Low-level call",
+      "impact": "Medium",
+      "description": "Low-level call may lead to reentrancy"
+    },
+    {
+      "source": "slither",
+      "check": "solc-version",
+      "impact": "Informational",
+      "confidence": "High",
+      "description": "Version constraint ^0.8.0 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)\n\t- FullInlinerNonExpressionSplitArgumentEvaluationOrder\n\t- MissingSideEffectsOnSelectorAccess\n\t- AbiReencodingHeadOverflowWithStaticArrayCleanup\n\t- DirtyBytesArrayToStorage\n\t- DataLocationChangeInInternalOverride\n\t- NestedCalldataArrayAbiReencodingSizeValidation\n\t- SignedImmutables\n\t- ABIDecodeTwoDimensionalArrayMemory\n\t- KeccakCaching.\nIt is used by:\n\t- ^0.8.0 (../../../../../tmp/tmpf3ytrun4/contract.sol#1)\n"
+    },
+    {
+      "source": "slither",
+      "check": "low-level-calls",
+      "impact": "Informational",
+      "confidence": "High",
+      "description": "Low level call in Test.withdraw() (../../../../../tmp/tmpf3ytrun4/contract.sol#1):\n\t- (s,None) = msg.sender.call() (../../../../../tmp/tmpf3ytrun4/contract.sol#1)\n"
+    }
+  ],
+  "audit_id": "6037713a-6958-48b3-8e1c-720a180821a4",
+  "timestamp": "2026-01-04T10:34:27.416162"
+}
