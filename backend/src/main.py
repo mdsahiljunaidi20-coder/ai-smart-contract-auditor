@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -11,13 +12,24 @@ import uuid
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 
-# ================= AI IMPORT (Day 10) =================
-from src.ai_engine import explain_issue
+# ================= AI IMPORTS =================
+from src.ai_engine import explain_issue          # Day 10
+from src.ai_fix_engine import generate_fix       # Day 11
 
 # =====================================================
 # App Init
 # =====================================================
 app = FastAPI(title="AI Smart Contract Auditor")
+# =====================================================
+# CORS Middleware (Required for Frontend - Day 13)
+# =====================================================
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Vite frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # =====================================================
 # Constants & Config
@@ -207,7 +219,7 @@ def login(user: UserInput):
     return {"access_token": token, "token_type": "bearer"}
 
 # =====================================================
-# Core Audit API (Protected + AI)  🔥 DAY 10
+# Core Audit API (Protected + AI Explanation + AI Fix)
 # =====================================================
 @app.post("/analyze")
 def analyze_contract(
@@ -219,16 +231,21 @@ def analyze_contract(
 
     issues = rule_issues + slither_issues
 
-    # ===== AI Explanation Layer (Day 10) =====
-    explained_issues = []
+    enhanced_issues = []
     for issue in issues:
+        # ---- AI Explanation (Day 10) ----
         explained = explain_issue(issue, input.code)
-        explained_issues.append(explained)
+
+        # ---- AI Fix Suggestion (Day 11) ----
+        fix = generate_fix(issue, input.code)
+        explained["ai_fix"] = fix
+
+        enhanced_issues.append(explained)
 
     report = {
         "contract": input.contract_name,
-        "total_issues": len(explained_issues),
-        "issues": explained_issues
+        "total_issues": len(enhanced_issues),
+        "issues": enhanced_issues
     }
 
     audit_id = save_report(report)
@@ -258,4 +275,4 @@ def get_report(
 # =====================================================
 @app.get("/")
 def root():
-    return {"message": "Backend running (Day 10 complete)"}
+    return {"message": "Backend running (Day 11 complete)"}
