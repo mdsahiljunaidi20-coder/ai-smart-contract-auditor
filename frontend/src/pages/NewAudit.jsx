@@ -1,44 +1,45 @@
 import { useState } from "react";
-import { analyzeContract } from "../services/api";
 import { useNavigate } from "react-router-dom";
+import { analyzeContract } from "../services/api";
 
 export default function NewAudit() {
+  const [name, setName] = useState("");
   const [code, setCode] = useState("");
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  async function handleAnalyze() {
-    if (!code.trim()) return alert("Paste contract code");
-
+  const analyze = async () => {
     try {
-      setLoading(true);
-      const result = await analyzeContract("TestContract", code);
-      localStorage.setItem("lastReport", JSON.stringify(result));
-      navigate("/results");
-    } catch (e) {
-      alert("Analysis failed");
-    } finally {
-      setLoading(false);
+      const result = await analyzeContract(name, code);
+      navigate("/results", { state: result });
+    } catch (err) {
+      alert("Analysis failed. Check console.");
+      console.error(err);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
-      <h1 className="text-2xl font-bold mb-4">🧪 New Audit</h1>
+    <div className="p-6 text-white">
+      <h2 className="text-2xl mb-4">New Audit</h2>
+
+      <input
+        className="w-full p-2 mb-3 text-black"
+        placeholder="Contract name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
 
       <textarea
-        className="w-full h-64 p-3 bg-gray-800 rounded text-sm"
-        placeholder="Paste Solidity contract here..."
+        className="w-full h-64 p-2 text-black"
+        placeholder="Paste Solidity code here"
         value={code}
         onChange={(e) => setCode(e.target.value)}
       />
 
       <button
-        onClick={handleAnalyze}
-        disabled={loading}
-        className="mt-4 bg-green-600 px-4 py-2 rounded hover:bg-green-700"
+        onClick={analyze}
+        className="mt-4 px-4 py-2 bg-blue-600 rounded"
       >
-        {loading ? "Analyzing..." : "Analyze"}
+        Analyze
       </button>
     </div>
   );

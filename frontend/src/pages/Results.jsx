@@ -1,20 +1,24 @@
-export default function Results() {
-  const report = JSON.parse(localStorage.getItem("lastReport"));
+import { useLocation } from "react-router-dom";
 
-  if (!report) {
-    return <p className="text-white p-6">No report found</p>;
-  }
+export default function Results() {
+  const { state } = useLocation();
+
+  if (!state) return <p>No results</p>;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
-      <h1 className="text-2xl font-bold mb-4">📄 Audit Results</h1>
+    <div className="min-h-screen bg-gray-900 text-white p-8">
+      <h2 className="text-2xl mb-4">Audit Results</h2>
 
-      <p className="mb-2">Contract: {report.contract}</p>
-      <p className="mb-4">Total Issues: {report.total_issues}</p>
-
-      <pre className="bg-gray-800 p-4 rounded text-sm overflow-x-auto">
-        {JSON.stringify(report.issues, null, 2)}
-      </pre>
+      {state.issues.map((issue, i) => (
+        <div key={i} className="bg-gray-800 p-4 mb-4 rounded">
+          <p><b>Check:</b> {issue.check}</p>
+          <p><b>Impact:</b> {issue.impact}</p>
+          <p><b>Why:</b> {issue.ai_explanation?.why}</p>
+          <p className="text-green-400 mt-2">
+            <b>Fix:</b> {issue.ai_fix?.note}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }
