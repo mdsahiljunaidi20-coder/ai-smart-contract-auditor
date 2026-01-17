@@ -11,6 +11,9 @@ import uuid
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 
+# ================= AI IMPORT (Day 10) =================
+from src.ai_engine import explain_issue
+
 # =====================================================
 # App Init
 # =====================================================
@@ -204,7 +207,7 @@ def login(user: UserInput):
     return {"access_token": token, "token_type": "bearer"}
 
 # =====================================================
-# Core Audit API (Protected)
+# Core Audit API (Protected + AI)  🔥 DAY 10
 # =====================================================
 @app.post("/analyze")
 def analyze_contract(
@@ -216,10 +219,16 @@ def analyze_contract(
 
     issues = rule_issues + slither_issues
 
+    # ===== AI Explanation Layer (Day 10) =====
+    explained_issues = []
+    for issue in issues:
+        explained = explain_issue(issue, input.code)
+        explained_issues.append(explained)
+
     report = {
         "contract": input.contract_name,
-        "total_issues": len(issues),
-        "issues": issues
+        "total_issues": len(explained_issues),
+        "issues": explained_issues
     }
 
     audit_id = save_report(report)
@@ -249,4 +258,4 @@ def get_report(
 # =====================================================
 @app.get("/")
 def root():
-    return {"message": "Backend running (Day 9 complete)"}
+    return {"message": "Backend running (Day 10 complete)"}
