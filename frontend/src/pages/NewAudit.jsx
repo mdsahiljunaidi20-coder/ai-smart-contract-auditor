@@ -3,43 +3,57 @@ import { useNavigate } from "react-router-dom";
 import { analyzeContract } from "../services/api";
 
 export default function NewAudit() {
-  const [name, setName] = useState("");
+  const [contractName, setContractName] = useState("");
   const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const analyze = async () => {
+  const handleAnalyze = async () => {
+    if (!contractName || !code) {
+      alert("Please enter contract name and code");
+      return;
+    }
+
     try {
-      const result = await analyzeContract(name, code);
-      navigate("/results", { state: result });
+      setLoading(true);
+      const report = await analyzeContract(contractName, code);
+
+      // ✅ SAVE REPORT
+      localStorage.setItem("audit_report", JSON.stringify(report));
+
+      // ✅ GO TO RESULTS
+      navigate("/results");
     } catch (err) {
-      alert("Analysis failed. Check console.");
-      console.error(err);
+      alert(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="p-6 text-white">
-      <h2 className="text-2xl mb-4">New Audit</h2>
+    <div className="min-h-screen bg-black text-white p-8">
+      <h1 className="text-2xl font-bold mb-4">New Smart Contract Audit</h1>
 
       <input
-        className="w-full p-2 mb-3 text-black"
-        placeholder="Contract name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
+        className="w-full p-2 mb-4 bg-gray-800 text-white rounded"
+        placeholder="Contract Name (e.g. Wallet.sol)"
+        value={contractName}
+        onChange={(e) => setContractName(e.target.value)}
       />
 
       <textarea
-        className="w-full h-64 p-2 text-black"
+        className="w-full h-64 p-2 mb-4 bg-gray-800 text-white rounded"
         placeholder="Paste Solidity code here"
         value={code}
         onChange={(e) => setCode(e.target.value)}
       />
 
       <button
-        onClick={analyze}
-        className="mt-4 px-4 py-2 bg-blue-600 rounded"
+        onClick={handleAnalyze}
+        disabled={loading}
+        className="bg-green-600 px-6 py-2 rounded hover:bg-green-700"
       >
-        Analyze
+        {loading ? "Analyzing..." : "Analyze"}
       </button>
     </div>
   );
